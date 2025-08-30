@@ -4,8 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,7 +14,7 @@ public class TrailerDto {
     private String thumbnailUrl;
     private String channelId;
     private String channelTitle;
-    private LocalDateTime publishedAt;
+    private String publishedAt;
     private String duration;
     private Long viewCount;
     private String movieTitle;

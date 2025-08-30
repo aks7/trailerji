@@ -3,6 +3,8 @@ package com.ak.trailerji.controller;
 import com.ak.trailerji.dto.TrailerDto;
 import com.ak.trailerji.service.TrailerService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,13 +16,16 @@ import java.util.List;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*", maxAge = 3600)
 public class TrailerController {
-    
+
+    private final Logger LOGGER= LoggerFactory.getLogger(TrailerController.class);
+
     private final TrailerService trailerService;
     
     @GetMapping("/public/latest")
     public ResponseEntity<List<TrailerDto>> getLatestTrailers(
             @RequestParam(defaultValue = "20") int limit) {
         List<TrailerDto> trailers = trailerService.getLatestOfficialTrailers(limit);
+        LOGGER.info("#test1.0 ============================= getLatestTrailers ={}" , trailers);
         return ResponseEntity.ok(trailers);
     }
     
@@ -28,6 +33,7 @@ public class TrailerController {
     public ResponseEntity<List<TrailerDto>> searchTrailers(
             @RequestParam String movieName) {
         List<TrailerDto> trailers = trailerService.searchTrailersByMovieName(movieName);
+        LOGGER.info("#test1.1 ============================= searchTrailers= {}" , trailers);
         return ResponseEntity.ok(trailers);
     }
     
@@ -35,6 +41,7 @@ public class TrailerController {
     public ResponseEntity<List<TrailerDto>> getPopularTrailers(
             @RequestParam(defaultValue = "20") int limit) {
         List<TrailerDto> trailers = trailerService.getLatestOfficialTrailers(limit);
+        LOGGER.info("#test1.2 ============================= getPopularTrailers= {}" , trailers);
         return ResponseEntity.ok(trailers);
     }
     

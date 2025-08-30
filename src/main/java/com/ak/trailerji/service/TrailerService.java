@@ -1,6 +1,8 @@
 package com.ak.trailerji.service;
 
 import com.ak.trailerji.dto.TrailerDto;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,8 +22,9 @@ public class TrailerService {
     
     @Value("${tmdb.api.key}")
     private String tmdbApiKey;
-    
+
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     // Official movie studio channel IDs (verified channels only)
     private static final Set<String> OFFICIAL_STUDIO_CHANNELS = Set.of(
@@ -101,7 +104,7 @@ public class TrailerService {
         }
     }
     
-    private List<TrailerDto> getTrailersFromYouTube(int maxResults) {
+    private List<TrailerDto> getTrailersFromYouTube1(int maxResults) {
         try {
             List<TrailerDto> trailers = new ArrayList<>();
             
@@ -128,7 +131,53 @@ public class TrailerService {
             return Collections.emptyList();
         }
     }
-    
+    public List<TrailerDto> getTrailersFromYouTube(int maxResults) {
+        List<TrailerDto> trailers = new ArrayList<>();
+        try {
+            for (String channelId : OFFICIAL_STUDIO_CHANNELS) {
+                String url = String.format(
+                        "https://www.googleapis.com/youtube/v3/search?" +
+                                "part=snippet&channelId=%s&maxResults=%d&order=date&type=video" +
+                                "&q=trailer&key=%s",
+                        channelId, maxResults, youtubeApiKey
+                );
+
+                log.info("Fetching from channel: {}", channelId);
+
+                String response = restTemplate.getForObject(url, String.class);
+                JsonNode root = objectMapper.readTree(response);
+                JsonNode items = root.get("items");
+                if (items != null && items.isArray()) {
+                    for (JsonNode item : items) {
+                        JsonNode snippet = item.get("snippet");
+                        String videoId = item.path("id").path("videoId").asText();
+                        if (videoId == null || videoId.isEmpty()) continue;
+
+                        TrailerDto dto = new TrailerDto();
+                        dto.setVideoId(videoId);
+                        dto.setTitle(snippet.path("title").asText());
+                        dto.setDescription(snippet.path("description").asText());
+                        dto.setChannelTitle(snippet.path("channelTitle").asText());
+                        dto.setPublishedAt(snippet.path("publishedAt").asText());
+                        dto.setThumbnailUrl(snippet.path("thumbnails").path("high").path("url").asText());
+                        trailers.add(dto);
+                    }
+                }
+            }
+
+            // Sort by published date, most recent first, and limit
+            return trailers.stream()
+                    .sorted(Comparator.comparing(TrailerDto::getPublishedAt).reversed())
+                    .limit(maxResults)
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.error("Error fetching YouTube trailers: ", e);
+            return Collections.emptyList();
+        }
+    }
+
+
     private boolean isOfficialTrailer(String title, String description, String channelId) {
         String titleLower = title.toLowerCase();
         String descriptionLower = description.toLowerCase();
