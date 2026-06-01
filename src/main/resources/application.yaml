@@ -1,5 +1,7 @@
 # Spring Boot Application Configuration
 spring:
+  config:
+    import: optional:classpath:application-secrets.yaml
   application:
     name: movie-trailer-backend
 
@@ -46,11 +48,11 @@ app:
 # Third-Party API Configurations
 youtube:
   api:
-    key: AIzaSyCWdC9a1ZsyRFrTtZasBqlxKv-EAR0X8mg
+    key: ${YOUTUBE_API_KEY}
 
 tmdb:
   api:
-    key: 49e3f04fc0315e1e59007dafd85c005d
+    key: ${TMDB_API_KEY}
 
 # Logging Configuration
 logging:
