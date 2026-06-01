@@ -1,0 +1,62 @@
+# Spring Boot Application Configuration
+spring:
+  application:
+    name: movie-trailer-backend
+
+  # Database Configuration
+  datasource:
+    # Notice the single quotes at the start/end, and the \; between the commands
+    url: 'jdbc:h2:mem:trailerji_db;INIT=CREATE SCHEMA IF NOT EXISTS trailerji_db\;SET SCHEMA trailerji_db'
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+
+    # Commented-out MySQL Configuration
+    # url: jdbc:mysql://localhost:3306/movie_trailers_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+    # username: root
+    # password: password
+    # driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: create
+    defer-datasource-initialization: true
+    show-sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        format_sql: true
+        # dialect: org.hibernate.dialect.MySQL8Dialect
+
+# Server Configuration
+server:
+  port: 8080
+
+# Custom Application Configurations (JWT & CORS)
+app:
+  jwt:
+    secret: movieTrailerSecretKeyForJWTTokenGeneration2025
+    expiration: 86400000
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+      - http://localhost:3001
+
+# Third-Party API Configurations
+youtube:
+  api:
+    key: AIzaSyCWdC9a1ZsyRFrTtZasBqlxKv-EAR0X8mg
+
+tmdb:
+  api:
+    key: 49e3f04fc0315e1e59007dafd85c005d
+
+# Logging Configuration
+logging:
+  level:
+    com:
+      movietrailers: DEBUG
+    org:
+      springframework:
+        security: DEBUG
