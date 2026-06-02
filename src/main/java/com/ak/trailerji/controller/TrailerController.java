@@ -44,6 +44,15 @@ public class TrailerController {
         LOGGER.info("#test1.2 ============================= getPopularTrailers= {}" , trailers);
         return ResponseEntity.ok(trailers);
     }
+
+    // Cached endpoint
+    @GetMapping("/public/cached/latest")
+    public ResponseEntity<List<TrailerDto>> getCachedTrailers(
+            @RequestParam(defaultValue = "20") int limit) {
+        List<TrailerDto> trailers = trailerService.getCachedTrailers(limit);
+        LOGGER.info("#test1.3 ============================= getCachedTrailers= {}" , trailers);
+        return ResponseEntity.ok(trailers);
+    }
     
     @GetMapping("/public/genres/{genre}")
     public ResponseEntity<List<TrailerDto>> getTrailersByGenre(

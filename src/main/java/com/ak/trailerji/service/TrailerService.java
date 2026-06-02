@@ -1,30 +1,42 @@
 package com.ak.trailerji.service;
 
 import com.ak.trailerji.dto.TrailerDto;
+import com.ak.trailerji.entity.CachedTrailer;
+import com.ak.trailerji.repository.CachedTrailerRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TrailerService {
-    
+     
     @Value("${youtube.api.key}")
     private String youtubeApiKey;
-    
+     
     @Value("${tmdb.api.key}")
     private String tmdbApiKey;
+    
+    @Value("${cache.refresh.interval.ms:3600000}")
+    private long cacheRefreshInterval;
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final CachedTrailerRepository cachedTrailerRepository;
     
     // Official movie studio channel IDs (verified channels only)
     private static final Set<String> OFFICIAL_STUDIO_CHANNELS = Set.of(
@@ -134,38 +146,39 @@ public class TrailerService {
     public List<TrailerDto> getTrailersFromYouTube(int maxResults) {
         List<TrailerDto> trailers = new ArrayList<>();
         try {
-            for (String channelId : OFFICIAL_STUDIO_CHANNELS) {
-                String url = String.format(
-                        "https://www.googleapis.com/youtube/v3/search?" +
-                                "part=snippet&channelId=%s&maxResults=%d&order=date&type=video" +
-                                "&q=trailer&key=%s",
-                        channelId, maxResults, youtubeApiKey
-                );
+            String url = String.format(
+                    "https://www.googleapis.com/youtube/v3/search?" +
+                            "part=snippet&maxResults=%d&order=date&type=video" +
+                            "&q=official+trailer&key=%s",
+                    Math.min(maxResults * 2, 50), youtubeApiKey
+            );
 
-                log.info("Fetching from channel: {}", channelId);
+            log.info("Fetching official trailers from YouTube");
 
-                String response = restTemplate.getForObject(url, String.class);
-                JsonNode root = objectMapper.readTree(response);
-                JsonNode items = root.get("items");
-                if (items != null && items.isArray()) {
-                    for (JsonNode item : items) {
-                        JsonNode snippet = item.get("snippet");
-                        String videoId = item.path("id").path("videoId").asText();
-                        if (videoId == null || videoId.isEmpty()) continue;
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode items = root.get("items");
+            if (items != null && items.isArray()) {
+                for (JsonNode item : items) {
+                    JsonNode snippet = item.get("snippet");
+                    String channelId = snippet.path("channelId").asText();
+                    if (!OFFICIAL_STUDIO_CHANNELS.contains(channelId)) continue;
 
-                        TrailerDto dto = new TrailerDto();
-                        dto.setVideoId(videoId);
-                        dto.setTitle(snippet.path("title").asText());
-                        dto.setDescription(snippet.path("description").asText());
-                        dto.setChannelTitle(snippet.path("channelTitle").asText());
-                        dto.setPublishedAt(snippet.path("publishedAt").asText());
-                        dto.setThumbnailUrl(snippet.path("thumbnails").path("high").path("url").asText());
-                        trailers.add(dto);
-                    }
+                    String videoId = item.path("id").path("videoId").asText();
+                    if (videoId == null || videoId.isEmpty()) continue;
+
+                    TrailerDto dto = new TrailerDto();
+                    dto.setVideoId(videoId);
+                    dto.setChannelId(channelId);
+                    dto.setTitle(snippet.path("title").asText());
+                    dto.setDescription(snippet.path("description").asText());
+                    dto.setChannelTitle(snippet.path("channelTitle").asText());
+                    dto.setPublishedAt(snippet.path("publishedAt").asText());
+                    dto.setThumbnailUrl(snippet.path("thumbnails").path("high").path("url").asText());
+                    trailers.add(dto);
                 }
             }
 
-            // Sort by published date, most recent first, and limit
             return trailers.stream()
                     .sorted(Comparator.comparing(TrailerDto::getPublishedAt).reversed())
                     .limit(maxResults)
@@ -222,5 +235,65 @@ public class TrailerService {
             log.error("Error searching trailers for movie: {}", movieName, e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Fetches trailers from external APIs and stores them in the cache
+     * @param maxResults Maximum number of trailers to fetch and store
+     */
+    @Transactional
+    public void fetchAndStoreTrailers(int maxResults) {
+        // Fetch from APIs (existing logic)
+        List<TrailerDto> trailers = getLatestOfficialTrailers(maxResults);
+        
+        // Upsert: atomic MERGE INTO at the database level
+        for (TrailerDto dto : trailers) {
+            LocalDateTime publishedAt;
+            try {
+                DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
+                publishedAt = LocalDateTime.parse(dto.getPublishedAt(), formatter);
+            } catch (Exception e) {
+                publishedAt = LocalDateTime.now();
+            }
+            cachedTrailerRepository.upsertTrailer(
+                    dto.getVideoId(),
+                    dto.getTitle(),
+                    dto.getDescription(),
+                    dto.getChannelTitle(),
+                    publishedAt,
+                    dto.getThumbnailUrl()
+            );
+        }
+    }
+
+    /**
+     * Gets trailers from the cache
+     * @param limit Maximum number of trailers to return
+     * @return List of trailers (mapped to DTO)
+     */
+    public List<TrailerDto> getCachedTrailers(int limit) {
+        Page<CachedTrailer> page = cachedTrailerRepository.findByOrderByPublishedAtDesc(PageRequest.of(0, limit));
+        return page.stream().map(this::mapToDto).toList();
+    }
+
+    private TrailerDto mapToDto(CachedTrailer entity) {
+        TrailerDto dto = new TrailerDto();
+        dto.setVideoId(entity.getVideoId());
+        dto.setTitle(entity.getTitle());
+        dto.setDescription(entity.getDescription());
+        dto.setChannelTitle(entity.getChannelTitle());
+        dto.setPublishedAt(entity.getPublishedAt().toString());
+        dto.setThumbnailUrl(entity.getThumbnailUrl());
+        return dto;
+    }
+
+    /**
+     * Scheduled method to refresh the cache periodically.
+     */
+    @Scheduled(fixedDelayString = "${cache.refresh.interval.ms:3600000}") // Default 1 hour
+    @Transactional
+    public void refreshCache() {
+        log.info("Refreshing trailer cache");
+        fetchAndStoreTrailers(100); // Fetch 100 trailers by default
     }
 }

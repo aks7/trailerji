@@ -1,0 +1,32 @@
+package com.ak.trailerji.repository;
+
+import com.ak.trailerji.entity.CachedTrailer;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
+
+public interface CachedTrailerRepository extends JpaRepository<CachedTrailer, Long> {
+    Page<CachedTrailer> findByOrderByPublishedAtDesc(Pageable pageable);
+    Optional<CachedTrailer> findByVideoId(String videoId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(value = """
+            MERGE INTO cached_trailers (video_id, title, description, channel_title, published_at, thumbnail_url)
+            KEY (video_id)
+            VALUES (:videoId, :title, :description, :channelTitle, :publishedAt, :thumbnailUrl)
+            """, nativeQuery = true)
+    void upsertTrailer(@Param("videoId") String videoId,
+                       @Param("title") String title,
+                       @Param("description") String description,
+                       @Param("channelTitle") String channelTitle,
+                       @Param("publishedAt") LocalDateTime publishedAt,
+                       @Param("thumbnailUrl") String thumbnailUrl);
+}
