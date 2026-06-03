@@ -50,7 +50,7 @@ public class TrailerController {
     public ResponseEntity<List<TrailerDto>> getCachedTrailers(
             @RequestParam(defaultValue = "20") int limit) {
         List<TrailerDto> trailers = trailerService.getCachedTrailers(limit);
-        LOGGER.info("#test1.3 ============================= getCachedTrailers= {}" , trailers);
+        LOGGER.debug("#test1.3 ============================= getCachedTrailers= {}" , trailers);
         return ResponseEntity.ok(trailers);
     }
     

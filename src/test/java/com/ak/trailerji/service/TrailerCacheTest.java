@@ -46,41 +46,50 @@ class TrailerCacheTest {
             {
               "items": [
                 {
-                  "id": { "videoId": "vid001" },
                   "snippet": {
                     "channelId": "%s",
-                    "title": "Trailer One",
-                    "description": "Description of trailer one",
+                    "title": "Official Trailer One",
+                    "description": "Description of official trailer one",
                     "channelTitle": "Marvel Entertainment",
                     "publishedAt": "2025-12-01T00:00:00Z",
                     "thumbnails": {
                       "high": { "url": "https://example.com/thumb1.jpg" }
+                    },
+                    "resourceId": {
+                      "kind": "youtube#video",
+                      "videoId": "vid001"
                     }
                   }
                 },
                 {
-                  "id": { "videoId": "vid002" },
                   "snippet": {
                     "channelId": "%s",
-                    "title": "Trailer Two",
-                    "description": "Description of trailer two",
+                    "title": "Official Trailer Two",
+                    "description": "Description of official trailer two",
                     "channelTitle": "Warner Bros. Pictures",
                     "publishedAt": "2025-11-15T00:00:00Z",
                     "thumbnails": {
                       "high": { "url": "https://example.com/thumb2.jpg" }
+                    },
+                    "resourceId": {
+                      "kind": "youtube#video",
+                      "videoId": "vid002"
                     }
                   }
                 },
                 {
-                  "id": { "videoId": "vid003" },
                   "snippet": {
                     "channelId": "%s",
-                    "title": "Trailer Three",
-                    "description": "Description of trailer three",
+                    "title": "Official Trailer Three",
+                    "description": "Description of official trailer three",
                     "channelTitle": "Universal Pictures",
                     "publishedAt": "2025-10-20T00:00:00Z",
                     "thumbnails": {
                       "high": { "url": "https://example.com/thumb3.jpg" }
+                    },
+                    "resourceId": {
+                      "kind": "youtube#video",
+                      "videoId": "vid003"
                     }
                   }
                 }
@@ -92,28 +101,34 @@ class TrailerCacheTest {
             {
               "items": [
                 {
-                  "id": { "videoId": "vid001" },
                   "snippet": {
                     "channelId": "%s",
-                    "title": "Trailer One UPDATED",
+                    "title": "Official Trailer One UPDATED",
                     "description": "Updated description",
                     "channelTitle": "Marvel Entertainment",
                     "publishedAt": "2025-12-01T00:00:00Z",
                     "thumbnails": {
                       "high": { "url": "https://example.com/thumb1_updated.jpg" }
+                    },
+                    "resourceId": {
+                      "kind": "youtube#video",
+                      "videoId": "vid001"
                     }
                   }
                 },
                 {
-                  "id": { "videoId": "vid004" },
                   "snippet": {
                     "channelId": "%s",
-                    "title": "Trailer Four",
-                    "description": "Brand new trailer",
+                    "title": "Official Trailer Four",
+                    "description": "Brand new official trailer",
                     "channelTitle": "Sony Pictures",
                     "publishedAt": "2025-09-01T00:00:00Z",
                     "thumbnails": {
                       "high": { "url": "https://example.com/thumb4.jpg" }
+                    },
+                    "resourceId": {
+                      "kind": "youtube#video",
+                      "videoId": "vid004"
                     }
                   }
                 }
@@ -145,8 +160,8 @@ class TrailerCacheTest {
                 .filter(t -> t.getVideoId().equals("vid001"))
                 .findFirst().orElseThrow();
 
-        assertThat(first.getTitle()).isEqualTo("Trailer One");
-        assertThat(first.getDescription()).isEqualTo("Description of trailer one");
+        assertThat(first.getTitle()).isEqualTo("Official Trailer One");
+        assertThat(first.getDescription()).isEqualTo("Description of official trailer one");
         assertThat(first.getChannelTitle()).isEqualTo("Marvel Entertainment");
         assertThat(first.getPublishedAt()).startsWith("2025-12-01");
         assertThat(first.getThumbnailUrl()).isEqualTo("https://example.com/thumb1.jpg");
@@ -196,7 +211,7 @@ class TrailerCacheTest {
         TrailerDto updated = cached.stream()
                 .filter(t -> t.getVideoId().equals("vid001"))
                 .findFirst().orElseThrow();
-        assertThat(updated.getTitle()).isEqualTo("Trailer One UPDATED");
+        assertThat(updated.getTitle()).isEqualTo("Official Trailer One UPDATED");
         assertThat(updated.getThumbnailUrl()).isEqualTo("https://example.com/thumb1_updated.jpg");
     }
 
