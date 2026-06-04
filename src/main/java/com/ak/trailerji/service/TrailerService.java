@@ -2,7 +2,9 @@ package com.ak.trailerji.service;
 
 import com.ak.trailerji.dto.TrailerDto;
 import com.ak.trailerji.entity.CachedTrailer;
+import com.ak.trailerji.entity.ChannelConfig;
 import com.ak.trailerji.repository.CachedTrailerRepository;
+import com.ak.trailerji.repository.ChannelConfigRepository;
 import com.ak.trailerji.stat.SyncStatistics;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,24 +42,7 @@ public class TrailerService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final CachedTrailerRepository cachedTrailerRepository;
-
-    // Official movie studio channel IDs (verified channels only)
-    private static final Set<String> OFFICIAL_STUDIO_CHANNELS = Set.of(
-            "UCvC4D8onUfXzvjTOM-dBfEA", // Marvel Entertainment
-            "UC_IRYSp4auq7hKLvziWVH6w", // Warner Bros. Pictures
-            "UCOwaTlA0nHlqMf4HBEWmLaw", // Universal Pictures
-            "UCiifkYAs_bq1pt_zbNAzYGg", // Sony Pictures Entertainment
-            "UCF0cXjaNm5Vx7EdCK4cxsYQ", // Paramount Pictures
-            "UC-sSERhv7LzPWA3TxjzXJkw", // 20th Century Studios
-            "UCYK0VLj-8kI2xJZRCCYgYnw", // Disney
-            "UCXwyXuLskuYsZiWNh0STJdw", // Paramount Movies UK
-            "UCP6T93Fe7qKYlvb_5Cs8Z4g", // Sky Cinema
-            "UC2QJf3QCNwYt8GeNPP5fJhg", // Universal Movies International
-            "UCq-Fj5jknLsUf-MWSy4_brA", // T-Series (Verified)
-            "UCbTLwN10NoCU4WDzLf1JMOA", // YRF - Yash Raj Films (Verified)
-            "UC3jMepkLKF8y4iiwWmAB3RA", // Zee Studios (Verified)
-            "UC56gTxNs4f9xZ7Pa2i5xNzg"  // Sony
-    );
+    private final ChannelConfigRepository channelConfigRepository;
 
     // Keywords to include (official trailer indicators)
     private static final Set<String> INCLUDE_KEYWORDS = Set.of(
@@ -126,9 +111,10 @@ public class TrailerService {
     private List<TrailerDto> getTrailersFromYouTube1(int maxResults) {
         try {
             List<TrailerDto> trailers = new ArrayList<>();
+            List<ChannelConfig> channels = channelConfigRepository.findAll();
 
-            // Search for trailers from official channels
-            for (String channelId : OFFICIAL_STUDIO_CHANNELS) {
+            for (ChannelConfig channel : channels) {
+                String channelId = channel.getChannelId();
                 String url = String.format(
                         "https://www.googleapis.com/youtube/v3/search?" +
                                 "part=snippet&channelId=%s&maxResults=5&order=date&type=video" +
@@ -136,11 +122,7 @@ public class TrailerService {
                         channelId, youtubeApiKey
                 );
 
-                // This is a simplified implementation
-                // In real implementation, you would make HTTP requests
-                // and parse JSON responses
-
-                log.info("Fetching from channel: {}", channelId);
+                log.info("Fetching from channel: {} ({})", channel.getChannelName(), channelId);
             }
 
             return trailers;
@@ -153,12 +135,19 @@ public class TrailerService {
 
     public List<TrailerDto> getTrailersFromYouTube(int maxResults, SyncStatistics stats) {
         List<TrailerDto> trailers = new ArrayList<>();
-        int perChannel = Math.max(1, maxResults / OFFICIAL_STUDIO_CHANNELS.size());
+        List<ChannelConfig> channels = channelConfigRepository.findAll();
+        Set<String> officialChannelIds = channels.stream()
+                .map(ChannelConfig::getChannelId).collect(Collectors.toSet());
+        int perChannel = 50;
 
-        for (String channelId : OFFICIAL_STUDIO_CHANNELS) {
-            stats.channelsChecked++; // Track channels checked
+        for (ChannelConfig channel : channels) {
+            String channelId = channel.getChannelId();
+            stats.channelsChecked++;
             try {
-                String uploadsPlaylistId = channelId.replaceFirst("^UC", "UU");
+                String uploadsPlaylistId = channel.getUploadsPlaylistId();
+                if (uploadsPlaylistId == null || uploadsPlaylistId.isBlank()) {
+                    uploadsPlaylistId = channelId.replaceFirst("^UC", "UU");
+                }
                 String url = UriComponentsBuilder.fromHttpUrl("https://www.googleapis.com/youtube/v3/playlistItems")
                         .queryParam("part", "snippet,contentDetails")
                         .queryParam("playlistId", uploadsPlaylistId)
@@ -172,7 +161,7 @@ public class TrailerService {
 
                 if (items != null && items.isArray()) {
                     for (JsonNode item : items) {
-                        stats.rawVideosFound++; // Track every video we see
+                        stats.rawVideosFound++;
 
                         JsonNode snippet = item.get("snippet");
                         String videoId = snippet.path("resourceId").path("videoId").asText();
@@ -187,10 +176,9 @@ public class TrailerService {
                         dto.setPublishedAt(snippet.path("publishedAt").asText());
                         dto.setThumbnailUrl(snippet.path("thumbnails").path("high").path("url").asText());
 
-                        // Check if it passes our filter
-                        if (isOfficialTrailer(dto.getTitle(), dto.getDescription(), dto.getChannelId())) {
+                        if (isOfficialTrailer(dto.getTitle(), dto.getDescription(), dto.getChannelId(), officialChannelIds)) {
                             trailers.add(dto);
-                            stats.officialTrailersKept++; // Track the ones that pass the filter
+                            stats.officialTrailersKept++;
                         }
                     }
                 }
@@ -217,20 +205,17 @@ public class TrailerService {
         }
     }
 
-    private boolean isOfficialTrailer(String title, String description, String channelId) {
+    private boolean isOfficialTrailer(String title, String description, String channelId, Set<String> officialChannelIds) {
         String titleLower = title.toLowerCase();
         String descriptionLower = description.toLowerCase();
 
-        // Must be from official channel
-        if (!OFFICIAL_STUDIO_CHANNELS.contains(channelId)) {
+        if (channelId == null || !officialChannelIds.contains(channelId)) {
             return false;
         }
 
-        // Must contain official trailer keywords
         boolean hasIncludeKeywords = INCLUDE_KEYWORDS.stream()
                 .anyMatch(keyword -> titleLower.contains(keyword) || descriptionLower.contains(keyword));
 
-        // Must not contain excluded keywords
         boolean hasExcludeKeywords = EXCLUDE_KEYWORDS.stream()
                 .anyMatch(keyword -> titleLower.contains(keyword) || descriptionLower.contains(keyword));
 
@@ -240,9 +225,10 @@ public class TrailerService {
     public List<TrailerDto> searchTrailersByMovieName(String movieName) {
         try {
             List<TrailerDto> results = new ArrayList<>();
+            List<ChannelConfig> channels = channelConfigRepository.findAll();
 
-            // Search in official channels only
-            for (String channelId : OFFICIAL_STUDIO_CHANNELS) {
+            for (ChannelConfig channel : channels) {
+                String channelId = channel.getChannelId();
                 String searchQuery = movieName + " trailer";
                 String url = String.format(
                         "https://www.googleapis.com/youtube/v3/search?" +
@@ -251,8 +237,7 @@ public class TrailerService {
                         channelId, searchQuery, youtubeApiKey
                 );
 
-                // Implementation would parse YouTube API response here
-                log.info("Searching for '{}' in channel: {}", movieName, channelId);
+                log.info("Searching for '{}' in channel: {} ({})", movieName, channel.getChannelName(), channelId);
             }
 
             return results;
@@ -308,14 +293,22 @@ public class TrailerService {
     }
 
     /**
-     * Gets trailers from the cache
-     *
-     * @param limit Maximum number of trailers to return
-     * @return List of trailers (mapped to DTO)
+     * Gets a single cached trailer by video ID
      */
-    public List<TrailerDto> getCachedTrailers(int limit) {
-        Page<CachedTrailer> page = cachedTrailerRepository.findByOrderByPublishedAtDesc(PageRequest.of(0, limit));
-        return page.stream().map(this::mapToDto).toList();
+    public Optional<TrailerDto> getTrailerByVideoId(String videoId) {
+        return cachedTrailerRepository.findByVideoId(videoId).map(this::mapToDto);
+    }
+
+    /**
+     * Gets trailers from the cache with pagination
+     *
+     * @param page Page number (0-based)
+     * @param size Page size
+     * @return Page of trailers (mapped to DTO)
+     */
+    public Page<TrailerDto> getCachedTrailers(int page, int size) {
+        return cachedTrailerRepository.findByOrderByPublishedAtDesc(PageRequest.of(page, size))
+                .map(this::mapToDto);
     }
 
     private TrailerDto mapToDto(CachedTrailer entity) {

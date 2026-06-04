@@ -5,6 +5,7 @@ import com.ak.trailerji.service.TrailerService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,12 +46,20 @@ public class TrailerController {
         return ResponseEntity.ok(trailers);
     }
 
-    // Cached endpoint
+    @GetMapping("/public/{videoId}")
+    public ResponseEntity<TrailerDto> getTrailerByVideoId(@PathVariable String videoId) {
+        return trailerService.getTrailerByVideoId(videoId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // Cached endpoint with pagination
     @GetMapping("/public/cached/latest")
-    public ResponseEntity<List<TrailerDto>> getCachedTrailers(
-            @RequestParam(defaultValue = "20") int limit) {
-        List<TrailerDto> trailers = trailerService.getCachedTrailers(limit);
-        LOGGER.debug("#test1.3 ============================= getCachedTrailers= {}" , trailers);
+    public ResponseEntity<Page<TrailerDto>> getCachedTrailers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<TrailerDto> trailers = trailerService.getCachedTrailers(page, size);
+        LOGGER.debug("getCachedTrailers page={} size={} total={}", page, size, trailers.getTotalElements());
         return ResponseEntity.ok(trailers);
     }
     
