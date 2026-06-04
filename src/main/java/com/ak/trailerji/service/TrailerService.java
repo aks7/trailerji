@@ -195,12 +195,14 @@ public class TrailerService {
                     }
                 }
             } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
-                stats.channelsNotFound++; // Track dead channels
+                stats.recordChannelError(channelId, "Uploads playlist not found (404)");
                 log.warn("Uploads playlist not found for channel: {}. Skipping...", channelId);
             } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                stats.recordChannelError(channelId, "API quota exceeded (429)");
                 log.error("CRITICAL: YouTube API Quota Exceeded!");
                 break;
             } catch (Exception e) {
+                stats.recordChannelError(channelId, e.getClass().getSimpleName() + ": " + shortenError(e.getMessage()));
                 log.error("Error fetching trailers for channel: {}. Skipping...", channelId, e);
             }
         }
@@ -325,6 +327,14 @@ public class TrailerService {
         dto.setPublishedAt(entity.getPublishedAt().toString());
         dto.setThumbnailUrl(entity.getThumbnailUrl());
         return dto;
+    }
+
+    private static String shortenError(String message) {
+        if (message == null) return "Unknown error";
+        int newlineIdx = message.indexOf('\n');
+        int braceIdx = message.indexOf("{\n");
+        int cutoff = (braceIdx >= 0 && braceIdx < 200) ? braceIdx : Math.min(newlineIdx >= 0 ? newlineIdx : message.length(), 150);
+        return message.substring(0, cutoff).trim();
     }
 
     /**
