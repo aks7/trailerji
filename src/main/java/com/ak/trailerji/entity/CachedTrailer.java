@@ -35,6 +35,9 @@ public class CachedTrailer {
     @Column(length = 255)
     private String thumbnailUrl;
 
+    @Column(name = "channel_id", length = 255)
+    private String channelId;
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -90,5 +93,13 @@ public class CachedTrailer {
 
     public void setThumbnailUrl(String thumbnailUrl) {
         this.thumbnailUrl = thumbnailUrl;
+    }
+
+    public String getChannelId() {
+        return channelId;
+    }
+
+    public void setChannelId(String channelId) {
+        this.channelId = channelId;
     }
 }

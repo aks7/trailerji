@@ -284,7 +284,8 @@ public class TrailerService {
                     dto.getDescription(),
                     dto.getChannelTitle(),
                     publishedAt,
-                    dto.getThumbnailUrl()
+                    dto.getThumbnailUrl(),
+                    dto.getChannelId()
             );
         }
 
@@ -311,12 +312,25 @@ public class TrailerService {
                 .map(this::mapToDto);
     }
 
+    public Page<TrailerDto> getCachedTrailersByCategory(String category, int page, int size) {
+        List<ChannelConfig> channels = channelConfigRepository.findByCategory(category);
+        if (channels.isEmpty()) {
+            return Page.empty();
+        }
+        List<String> channelIds = channels.stream()
+                .map(ChannelConfig::getChannelId)
+                .collect(Collectors.toList());
+        return cachedTrailerRepository.findByChannelIdInOrderByPublishedAtDesc(channelIds, PageRequest.of(page, size))
+                .map(this::mapToDto);
+    }
+
     private TrailerDto mapToDto(CachedTrailer entity) {
         TrailerDto dto = new TrailerDto();
         dto.setVideoId(entity.getVideoId());
         dto.setTitle(entity.getTitle());
         dto.setDescription(entity.getDescription());
         dto.setChannelTitle(entity.getChannelTitle());
+        dto.setChannelId(entity.getChannelId());
         dto.setPublishedAt(entity.getPublishedAt().toString());
         dto.setThumbnailUrl(entity.getThumbnailUrl());
         return dto;

@@ -62,6 +62,17 @@ public class TrailerController {
         LOGGER.debug("getCachedTrailers page={} size={} total={}", page, size, trailers.getTotalElements());
         return ResponseEntity.ok(trailers);
     }
+
+    // Cached endpoint filtered by category with pagination
+    @GetMapping("/public/cached/category/{category}")
+    public ResponseEntity<Page<TrailerDto>> getCachedTrailersByCategory(
+            @PathVariable String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<TrailerDto> trailers = trailerService.getCachedTrailersByCategory(category, page, size);
+        LOGGER.debug("getCachedTrailersByCategory category={} page={} size={} total={}", category, page, size, trailers.getTotalElements());
+        return ResponseEntity.ok(trailers);
+    }
     
     @GetMapping("/public/genres/{genre}")
     public ResponseEntity<List<TrailerDto>> getTrailersByGenre(

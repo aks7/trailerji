@@ -24,6 +24,9 @@ public class ChannelConfig {
     @Column(name = "uploads_playlist_id", length = 255)
     private String uploadsPlaylistId;
 
+    @Column(length = 255)
+    private String category;
+
     public ChannelConfig() {}
 
     public ChannelConfig(String channelName, String channelId, String uploadsPlaylistId) {
@@ -40,4 +43,6 @@ public class ChannelConfig {
     public void setChannelId(String channelId) { this.channelId = channelId; }
     public String getUploadsPlaylistId() { return uploadsPlaylistId; }
     public void setUploadsPlaylistId(String uploadsPlaylistId) { this.uploadsPlaylistId = uploadsPlaylistId; }
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
 }
